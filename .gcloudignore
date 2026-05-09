@@ -1,0 +1,25 @@
+# Only upload what Cloud Build needs (the pre-built JAR + Dockerfile)
+# Exclude everything else to keep the upload fast
+
+# Exclude Maven source and local tools
+src/
+pom.xml
+maven-dist/
+*.log
+*.tmp
+
+# Exclude git/IDE files
+.git/
+.idea/
+.vscode/
+*.iml
+
+# Exclude Maven wrapper artifacts we don't need
+target/maven-archiver/
+target/maven-status/
+target/generated-sources/
+target/generated-test-sources/
+target/test-classes/
+target/*.jar.original
+
+# Keep: Dockerfile and target/proxymaze-1.0.0.jar
