@@ -14,11 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Dynamic background scheduler.
- * Runs a monitoring cycle every check_interval_seconds.
- * Can be restarted at runtime when config changes.
- */
+
 @Component
 public class MonitoringScheduler {
 
@@ -29,7 +25,7 @@ public class MonitoringScheduler {
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "proxy-monitor");
-        t.setDaemon(false); // IMPORTANT: keep alive on Cloud Run with CPU always allocated
+        t.setDaemon(false); 
         return t;
     });
 
@@ -44,34 +40,30 @@ public class MonitoringScheduler {
     @PostConstruct
     public void start() {
         restartWithInterval(dataStore.getConfig().getCheckIntervalSeconds());
-        log.info("✅ MonitoringScheduler started with interval={}s",
+        log.info(" MonitoringScheduler started with interval={}s",
                 dataStore.getConfig().getCheckIntervalSeconds());
     }
 
-    /**
-     * Restarts the scheduler with a new interval.
-     * Called when POST /config changes check_interval_seconds.
-     */
     public synchronized void restartWithInterval(int intervalSeconds) {
         if (currentTask != null && !currentTask.isCancelled()) {
-            currentTask.cancel(false); // let current cycle finish
+            currentTask.cancel(false); 
         }
 
         currentTask = scheduler.scheduleWithFixedDelay(
                 this::runCycle,
-                0,                  // initial delay
+                0,                  
                 intervalSeconds,
                 TimeUnit.SECONDS
         );
 
-        log.info("🔄 MonitoringScheduler rescheduled: interval={}s", intervalSeconds);
+        log.info(" MonitoringScheduler rescheduled: interval={}s", intervalSeconds);
     }
 
     private void runCycle() {
         try {
             monitoringService.runCycle();
         } catch (Exception e) {
-            log.error("💥 Monitoring cycle failed: {}", e.getMessage(), e);
+            log.error(" Monitoring cycle failed: {}", e.getMessage(), e);
         }
     }
 

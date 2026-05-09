@@ -1,11 +1,16 @@
 package com.proxymaze.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 
+
 public class CheckRecord {
-    @com.fasterxml.jackson.annotation.JsonProperty("checked_at")
+    @JsonProperty("checked_at")
     private Instant checkedAt;
     private String status;
+
+    @JsonIgnore
     private Long responseTimeMs;
 
     public CheckRecord() {}

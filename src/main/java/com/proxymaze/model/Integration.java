@@ -4,7 +4,7 @@ import java.util.List;
 
 public class Integration {
     private String integrationId;
-    private String type; // slack or discord
+    private String type; 
     private String webhookUrl;
     private String username;
     private List<String> events;

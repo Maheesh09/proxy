@@ -51,7 +51,6 @@ public class ConfigController {
 
         dataStore.setConfig(cfg);
 
-        // Dynamically restart scheduler if interval changed
         if (intervalChanged) {
             scheduler.restartWithInterval(cfg.getCheckIntervalSeconds());
         }

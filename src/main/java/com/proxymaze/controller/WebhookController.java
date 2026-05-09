@@ -23,7 +23,6 @@ public class WebhookController {
         this.dataStore = dataStore;
     }
 
-    /** POST /webhooks — register a webhook receiver */
     @PostMapping
     public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, Object> body) {
         String url = (String) body.get("url");
@@ -37,14 +36,12 @@ public class WebhookController {
         );
         dataStore.addWebhook(wh);
 
-        return ResponseEntity.status(201).body(Map.of(
-                "webhook_id", wh.getWebhookId(),
-                "url", wh.getUrl(),
-                "message", "Webhook registered successfully"
-        ));
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("webhook_id", wh.getWebhookId());
+        response.put("url", wh.getUrl());
+        return ResponseEntity.status(201).body(response);
     }
 
-    /** GET /webhooks — list all registered webhooks */
     @GetMapping
     public ResponseEntity<Map<String, Object>> listWebhooks() {
         List<Map<String, Object>> list = dataStore.getAllWebhooks().stream()
@@ -59,7 +56,6 @@ public class WebhookController {
         return ResponseEntity.ok(Map.of("total", list.size(), "webhooks", list));
     }
 
-    /** DELETE /webhooks/{id} — remove a webhook */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> removeWebhook(@PathVariable String id) {
         boolean removed = dataStore.removeWebhook(id);

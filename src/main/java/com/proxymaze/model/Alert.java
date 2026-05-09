@@ -5,7 +5,7 @@ import java.util.List;
 
 public class Alert {
     private String alertId;
-    private String status; // ACTIVE, RESOLVED
+    private String status; 
     private double failureRate;
     private int totalProxies;
     private int failedProxies;
@@ -17,7 +17,6 @@ public class Alert {
 
     public Alert() {}
 
-    // Getters & Setters
     public String getAlertId() { return alertId; }
     public void setAlertId(String alertId) { this.alertId = alertId; }
 

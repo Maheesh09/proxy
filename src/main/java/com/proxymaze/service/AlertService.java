@@ -11,15 +11,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
- * Alert lifecycle manager:
- *  - Only one ACTIVE alert at a time
- *  - ACTIVE → RESOLVED when failure_rate drops below threshold
- *  - New breach after resolution = brand-new alert_id
+ * Monitors the proxy pool state and manages the lifecycle of alerts.
  */
 @Service
 public class AlertService {
@@ -35,78 +34,65 @@ public class AlertService {
         this.webhookDeliveryService = webhookDeliveryService;
     }
 
+    /**
+     * Evaluates the proxy pool state.
+     * Fires/Resolves alerts based on the failure threshold (default 0.20).
+     */
     public synchronized void evaluate() {
-        Collection<ProxyEntry> all = dataStore.getAllProxies();
+        Collection<ProxyEntry> proxies = dataStore.getAllProxies();
+        if (proxies.isEmpty()) return;
 
-        // Only consider proxies that have been checked (not PENDING)
-        List<ProxyEntry> checked = all.stream()
-                .filter(p -> p.getStatus() != ProxyStatus.PENDING)
-                .toList();
-
-        if (checked.isEmpty()) return;
-
-        long downCount = all.stream().filter(p -> p.getStatus() == ProxyStatus.DOWN).count();
-        int total = all.size();
-        if (total == 0) return;
-        
-        double failureRate = (double) downCount / total;
-        double threshold = dataStore.getConfig().getFailureThreshold();
-
-        List<String> failedIds = all.stream()
+        int totalCount = proxies.size();
+        List<String> downIds = proxies.stream()
                 .filter(p -> p.getStatus() == ProxyStatus.DOWN)
                 .map(ProxyEntry::getId)
-                .toList();
+                .collect(Collectors.toList());
+        
+        int downCount = downIds.size();
+        double failureRate = (double) downCount / totalCount;
+        double threshold = dataStore.getConfig().getFailureThreshold();
 
-        Optional<Alert> activeAlert = dataStore.getActiveAlert();
+        Optional<Alert> activeAlertOpt = dataStore.getActiveAlert();
 
         if (failureRate >= threshold) {
-            if (activeAlert.isEmpty()) {
-                // Fire a new alert
-                Alert alert = new Alert();
-                alert.setAlertId(IdGenerator.generateId());
-                alert.setStatus("active");
-                alert.setFailureRate(failureRate);
-                alert.setTotalProxies(total);
-                alert.setFailedProxies((int) downCount);
-                alert.setFailedProxyIds(failedIds);
-                alert.setThreshold(threshold);
-                alert.setFiredAt(Instant.now());
-                alert.setMessage(String.format(
-                        "Failure rate %.1f%% exceeds threshold %.1f%%",
-                        failureRate * 100, threshold * 100));
-
-                dataStore.addAlert(alert);
-                log.warn("ALERT FIRED: {} - failure rate {}%", alert.getAlertId(),
-                        String.format("%.1f", failureRate * 100));
-                webhookDeliveryService.dispatch("alert.fired", alert);
+            if (activeAlertOpt.isEmpty()) {
+                // CHAPTER 09: New Alert with "alert-" prefix
+                Alert newAlert = new Alert();
+                newAlert.setAlertId(IdGenerator.generateShortId("alert"));
+                newAlert.setStatus("active");
+                newAlert.setFailureRate(Math.round(failureRate * 100.0) / 100.0);
+                newAlert.setTotalProxies(totalCount);
+                newAlert.setFailedProxies(downCount);
+                // Consistency: Use a copy of the ID list
+                newAlert.setFailedProxyIds(new ArrayList<>(downIds));
+                newAlert.setThreshold(threshold);
+                newAlert.setFiredAt(Instant.now());
+                newAlert.setMessage("Proxy pool failure rate exceeded threshold");
+                
+                dataStore.addAlert(newAlert);
+                webhookDeliveryService.dispatch("alert.fired", newAlert);
+                log.warn("ALERT FIRED: {} (rate: {})", newAlert.getAlertId(), failureRate);
             } else {
-                // Update existing active alert — same alert_id
-                Alert existing = activeAlert.get();
-                existing.setFailureRate(failureRate);
-                existing.setTotalProxies(total);
-                existing.setFailedProxies((int) downCount);
-                existing.setFailedProxyIds(failedIds);
-                existing.setMessage(String.format(
-                        "Failure rate %.1f%% exceeds threshold %.1f%%",
-                        failureRate * 100, threshold * 100));
-                dataStore.updateAlert(existing);
+                // Persistent Breach: Update the single active alert
+                Alert active = activeAlertOpt.get();
+                active.setFailureRate(Math.round(failureRate * 100.0) / 100.0);
+                active.setFailedProxies(downCount);
+                active.setFailedProxyIds(new ArrayList<>(downIds));
+                dataStore.updateAlert(active);
+                // No fired webhook for persistent breach
             }
-        } else {
-            if (activeAlert.isPresent()) {
-                Alert existing = activeAlert.get();
-                existing.setStatus("resolved");
-                existing.setResolvedAt(Instant.now());
-                existing.setFailureRate(failureRate);
-                existing.setTotalProxies(total);
-                existing.setFailedProxies((int) downCount);
-                existing.setFailedProxyIds(failedIds);
-                existing.setMessage(String.format(
-                        "Failure rate %.1f%% recovered below threshold %.1f%%",
-                        failureRate * 100, threshold * 100));
-                dataStore.updateAlert(existing);
-                log.info("ALERT RESOLVED: {}", existing.getAlertId());
-                webhookDeliveryService.dispatch("alert.resolved", existing);
-            }
+        } else if (activeAlertOpt.isPresent()) {
+            // Recovery: Resolve the active alert
+            Alert active = activeAlertOpt.get();
+            active.setStatus("resolved");
+            active.setResolvedAt(Instant.now());
+            active.setFailureRate(Math.round(failureRate * 100.0) / 100.0);
+            active.setFailedProxies(downCount);
+            active.setFailedProxyIds(new ArrayList<>(downIds));
+            
+            dataStore.updateAlert(active);
+            webhookDeliveryService.dispatch("alert.resolved", active);
+            log.info("ALERT RESOLVED: {}", active.getAlertId());
         }
     }
 }

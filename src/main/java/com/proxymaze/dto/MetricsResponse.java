@@ -19,7 +19,6 @@ public class MetricsResponse {
     @JsonProperty("webhook_deliveries")
     private int webhookDeliveries;
 
-    // Getters & Setters
     public int getTotalChecks() { return totalChecks; }
     public void setTotalChecks(int totalChecks) { this.totalChecks = totalChecks; }
 

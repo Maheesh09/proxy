@@ -1,10 +1,13 @@
 package com.proxymaze.controller;
 
-import com.proxymaze.dto.IntegrationRequest;
 import com.proxymaze.exception.InvalidRequestException;
+import com.proxymaze.model.Alert;
 import com.proxymaze.model.Integration;
+import com.proxymaze.service.WebhookDeliveryService;
 import com.proxymaze.storage.DataStore;
 import com.proxymaze.util.IdGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,14 +19,17 @@ import java.util.stream.Collectors;
 @RequestMapping("/integrations")
 public class IntegrationController {
 
+    private static final Logger log = LoggerFactory.getLogger(IntegrationController.class);
+
     private final DataStore dataStore;
+    private final WebhookDeliveryService webhookDeliveryService;
 
     @Autowired
-    public IntegrationController(DataStore dataStore) {
+    public IntegrationController(DataStore dataStore, WebhookDeliveryService webhookDeliveryService) {
         this.dataStore = dataStore;
+        this.webhookDeliveryService = webhookDeliveryService;
     }
 
-    /** POST /integrations — register a Slack or Discord integration */
     @PostMapping
     public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, Object> body) {
         String type = (String) body.get("type");
@@ -48,17 +54,27 @@ public class IntegrationController {
 
         dataStore.addIntegration(integration);
 
+        // KEY FIX: If there is already an active alert when an integration is registered,
+        // immediately dispatch the alert.fired event to the new integration.
+        // This handles the case where the evaluator registers integrations AFTER the alert fires.
+        Optional<Alert> activeAlert = dataStore.getActiveAlert();
+        if (activeAlert.isPresent() && integration.getEvents().contains("alert.fired")) {
+            Alert alert = activeAlert.get();
+            log.info("Integration [{}] registered with active alert [{}] — dispatching alert.fired immediately",
+                    integration.getIntegrationId(), alert.getAlertId());
+            // Dispatch in a background thread to avoid blocking the HTTP response
+            Thread.ofVirtual().start(() -> webhookDeliveryService.dispatchToIntegration("alert.fired", alert, integration));
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("integration_id", integration.getIntegrationId());
         result.put("type", integration.getType());
         result.put("webhook_url", integration.getWebhookUrl());
         result.put("username", integration.getUsername());
         result.put("events", integration.getEvents());
-        result.put("message", "Integration registered successfully");
         return ResponseEntity.ok(result);
     }
 
-    /** GET /integrations — list all integrations */
     @GetMapping
     public ResponseEntity<Map<String, Object>> listIntegrations() {
         List<Map<String, Object>> list = dataStore.getAllIntegrations().stream()
@@ -76,7 +92,6 @@ public class IntegrationController {
         return ResponseEntity.ok(Map.of("total", list.size(), "integrations", list));
     }
 
-    /** DELETE /integrations/{id} */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> removeIntegration(@PathVariable String id) {
         boolean removed = dataStore.removeIntegration(id);

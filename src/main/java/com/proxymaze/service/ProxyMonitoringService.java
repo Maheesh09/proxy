@@ -7,17 +7,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Collection;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-/**
- * Checks all proxies in parallel and updates DataStore.
- * Called by MonitoringScheduler every X seconds.
- */
+
 @Service
 public class ProxyMonitoringService {
 
@@ -26,9 +22,7 @@ public class ProxyMonitoringService {
     private final DataStore dataStore;
     private final ProxyProbeService probeService;
     private final AlertService alertService;
-
-    // Thread pool for parallel proxy checks
-    private final ExecutorService probePool = Executors.newCachedThreadPool();
+    private final ExecutorService probeExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     @Autowired
     public ProxyMonitoringService(DataStore dataStore, ProxyProbeService probeService, AlertService alertService) {
@@ -37,49 +31,25 @@ public class ProxyMonitoringService {
         this.alertService = alertService;
     }
 
-    /**
-     * Runs one full monitoring cycle:
-     * 1. Check all proxies in parallel
-     * 2. Update their state in DataStore
-     * 3. Trigger AlertService.evaluate()
-     */
-    public void runCycle() {
-        Collection<ProxyEntry> proxies = dataStore.getAllProxies();
-
-        if (proxies.isEmpty()) {
-            return;
-        }
+    public synchronized void runCycle() {
+        List<ProxyEntry> proxies = dataStore.getAllProxies();
+        if (proxies.isEmpty()) return;
 
         int timeoutMs = dataStore.getConfig().getRequestTimeoutMs();
-        log.debug("Starting monitoring cycle for {} proxies (timeout={}ms)", proxies.size(), timeoutMs);
+        log.debug("Starting monitoring cycle for {} proxies...", proxies.size());
 
-        List<Future<?>> futures = new ArrayList<>();
-
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (ProxyEntry proxy : proxies) {
-            futures.add(probePool.submit(() -> {
-                try {
-                    ProxyProbeService.ProbeResult result = probeService.probe(proxy, timeoutMs);
-                    proxy.recordCheck(result.success(), result.responseTimeMs());
-                    dataStore.incrementChecks();
-                    log.debug("Proxy [{}] {} → {}", proxy.getId(), proxy.getUrl(), proxy.getStatus());
-                } catch (Exception e) {
-                    log.error("Unexpected error probing proxy {}: {}", proxy.getUrl(), e.getMessage());
-                    proxy.recordCheck(false, -1L);
-                }
-            }));
+            futures.add(CompletableFuture.runAsync(() -> {
+                ProxyProbeService.ProbeResult result = probeService.probe(proxy, timeoutMs);
+                dataStore.incrementChecks();
+                proxy.recordCheck(result.success(), result.responseTimeMs());
+            }, probeExecutor));
         }
 
-        // Wait for all probes to complete
-        for (Future<?> f : futures) {
-            try {
-                f.get();
-            } catch (Exception e) {
-                log.error("Error waiting for probe: {}", e.getMessage());
-            }
-        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        // Now evaluate alert state based on fresh results
         alertService.evaluate();
-        log.debug("Monitoring cycle complete");
+        log.debug("Monitoring cycle complete.");
     }
 }

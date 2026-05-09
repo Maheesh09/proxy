@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Handles alert archive endpoints.
+ * Strictly adheres to Chapter 09 return format (raw JSON array).
+ */
 @RestController
 @RequestMapping("/alerts")
 public class AlertController {
@@ -21,23 +25,23 @@ public class AlertController {
         this.dataStore = dataStore;
     }
 
-    /** GET /alerts — newest first */
+    /**
+     * GET /alerts — Returns ALL alerts as a raw JSON array.
+     * Newest alerts first (descending order).
+     */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> listAlerts() {
+    public ResponseEntity<List<AlertResponse>> listAlerts() {
         List<Alert> all = new ArrayList<>(dataStore.getAllAlerts());
-        Collections.reverse(all); // newest first
+        // Reverse to show newest first
+        Collections.reverse(all); 
 
-        List<AlertResponse> list = all.stream().map(this::toResponse).collect(Collectors.toList());
-        long activeCount = list.stream().filter(a -> "active".equals(a.getStatus())).count();
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", list.size());
-        result.put("active", (int) activeCount);
-        result.put("alerts", list);
-        return ResponseEntity.ok(result);
+        List<AlertResponse> list = all.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(list);
     }
 
-    /** GET /alerts/active */
     @GetMapping("/active")
     public ResponseEntity<?> getActiveAlert() {
         return dataStore.getActiveAlert()

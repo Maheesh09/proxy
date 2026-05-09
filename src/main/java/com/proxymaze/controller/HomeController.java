@@ -9,7 +9,6 @@ public class HomeController {
 
     @GetMapping("/")
     public RedirectView home() {
-        // Redirect root to health endpoint for convenience
         return new RedirectView("/health");
     }
 }

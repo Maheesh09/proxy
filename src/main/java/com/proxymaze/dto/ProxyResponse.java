@@ -35,7 +35,6 @@ public class ProxyResponse {
     @JsonProperty("history")
     private java.util.List<com.proxymaze.model.CheckRecord> history;
 
-    // Getters & Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 

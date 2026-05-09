@@ -36,7 +36,6 @@ public class AlertResponse {
     @JsonProperty("message")
     private String message;
 
-    // Getters & Setters
     public String getAlertId() { return alertId; }
     public void setAlertId(String alertId) { this.alertId = alertId; }
 

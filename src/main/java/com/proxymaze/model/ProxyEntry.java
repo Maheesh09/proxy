@@ -44,13 +44,11 @@ public class ProxyEntry {
         CheckRecord record = new CheckRecord(now, status.name().toLowerCase(), responseTimeMs);
         history.add(record);
 
-        // Keep only the last MAX_HISTORY entries
         while (history.size() > MAX_HISTORY) {
             history.remove(0);
         }
     }
 
-    // Getters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 

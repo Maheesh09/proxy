@@ -29,7 +29,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGeneral(Exception ex) {
-        // Log the actual exception for debugging
         ex.printStackTrace(); 
         return buildErrorResponse("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
     }
