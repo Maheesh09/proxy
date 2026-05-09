@@ -1,12 +1,15 @@
 package com.proxymaze.model;
 
 public class RuntimeConfiguration {
+    @com.fasterxml.jackson.annotation.JsonProperty("check_interval_seconds")
     private int checkIntervalSeconds;
+    @com.fasterxml.jackson.annotation.JsonProperty("request_timeout_ms")
     private int requestTimeoutMs;
+    @com.fasterxml.jackson.annotation.JsonProperty("failure_threshold")
     private double failureThreshold;
 
     public RuntimeConfiguration() {
-        this.checkIntervalSeconds = 30;
+        this.checkIntervalSeconds = 10;
         this.requestTimeoutMs = 5000;
         this.failureThreshold = 0.20;
     }

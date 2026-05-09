@@ -25,20 +25,26 @@ public class IntegrationController {
 
     /** POST /integrations — register a Slack or Discord integration */
     @PostMapping
-    public ResponseEntity<Map<String, Object>> register(@RequestBody IntegrationRequest req) {
-        if (req.getType() == null || (!req.getType().equalsIgnoreCase("slack") && !req.getType().equalsIgnoreCase("discord"))) {
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, Object> body) {
+        String type = (String) body.get("type");
+        String webhookUrl = (String) body.get("webhook_url");
+        String username = (String) body.get("username");
+        @SuppressWarnings("unchecked")
+        List<String> events = (List<String>) body.get("events");
+
+        if (type == null || (!type.equalsIgnoreCase("slack") && !type.equalsIgnoreCase("discord"))) {
             throw new InvalidRequestException("type must be 'slack' or 'discord'");
         }
-        if (req.getWebhookUrl() == null || req.getWebhookUrl().isBlank()) {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
             throw new InvalidRequestException("webhook_url is required");
         }
 
         Integration integration = new Integration();
         integration.setIntegrationId(IdGenerator.generateId());
-        integration.setType(req.getType().toLowerCase());
-        integration.setWebhookUrl(req.getWebhookUrl().trim());
-        integration.setUsername(req.getUsername());
-        integration.setEvents(req.getEvents() != null ? req.getEvents() : List.of("alert.fired", "alert.resolved"));
+        integration.setType(type.toLowerCase());
+        integration.setWebhookUrl(webhookUrl.trim());
+        integration.setUsername(username);
+        integration.setEvents(events != null ? events : List.of("alert.fired", "alert.resolved"));
 
         dataStore.addIntegration(integration);
 

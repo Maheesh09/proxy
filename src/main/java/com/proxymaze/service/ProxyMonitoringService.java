@@ -60,6 +60,7 @@ public class ProxyMonitoringService {
                 try {
                     ProxyProbeService.ProbeResult result = probeService.probe(proxy, timeoutMs);
                     proxy.recordCheck(result.success(), result.responseTimeMs());
+                    dataStore.incrementChecks();
                     log.debug("Proxy [{}] {} → {}", proxy.getId(), proxy.getUrl(), proxy.getStatus());
                 } catch (Exception e) {
                     log.error("Unexpected error probing proxy {}: {}", proxy.getUrl(), e.getMessage());

@@ -33,6 +33,10 @@ public class SlackPayloadBuilder {
         if (alert.getFailedProxyIds() != null && !alert.getFailedProxyIds().isEmpty()) {
             fields.add(field("Failed IDs", String.join(", ", alert.getFailedProxyIds()), false));
         }
+        if (alert.getFiredAt() != null) {
+            String firedAtStr = DateTimeFormatter.ISO_INSTANT.format(alert.getFiredAt());
+            fields.add(field("Fired At", firedAtStr, false));
+        }
         attachment.put("fields", fields);
 
         String ts = alert.getFiredAt() != null

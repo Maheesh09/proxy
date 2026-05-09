@@ -1,6 +1,5 @@
 package com.proxymaze.controller;
 
-import com.proxymaze.dto.ProxyLoadRequest;
 import com.proxymaze.dto.ProxyResponse;
 import com.proxymaze.exception.InvalidRequestException;
 import com.proxymaze.exception.ProxyNotFoundException;
@@ -38,18 +37,18 @@ public class ProxyController {
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> addProxies(@RequestBody Map<String, Object> body) {
-        // Extract URLs
-        Object urlsRaw = body.get("urls");
-        if (urlsRaw == null) throw new InvalidRequestException("urls is required");
+        // Extract proxies (list of URLs)
+        Object proxiesRaw = body.get("proxies");
+        if (proxiesRaw == null) throw new InvalidRequestException("proxies is required");
 
         @SuppressWarnings("unchecked")
-        List<String> urls = (List<String>) urlsRaw;
-        if (urls.isEmpty()) throw new InvalidRequestException("urls list cannot be empty");
+        List<String> urls = (List<String>) proxiesRaw;
+        if (urls.isEmpty()) throw new InvalidRequestException("proxies list cannot be empty");
 
-        // Handle replace flag — default false = append
         boolean replace = false;
-        if (body.containsKey("replace") && Boolean.TRUE.equals(body.get("replace"))) {
-            replace = true;
+        Object replaceRaw = body.get("replace");
+        if (replaceRaw != null) {
+            replace = Boolean.parseBoolean(String.valueOf(replaceRaw));
         }
 
         if (replace) {
@@ -59,16 +58,31 @@ public class ProxyController {
         List<ProxyResponse> added = new ArrayList<>();
         for (String url : urls) {
             if (url == null || url.isBlank()) continue;
-            // Extract deterministic ID from URL path's last segment
             String id = ProxyIdExtractor.extractId(url.trim());
-            ProxyEntry entry = new ProxyEntry(id, url.trim());
-            dataStore.addProxy(entry);
-            added.add(toResponse(entry));
+            
+            dataStore.getProxy(id).ifPresentOrElse(
+                existing -> {
+                    existing.setUrl(url.trim()); 
+                    added.add(toResponse(existing));
+                },
+                () -> {
+                    ProxyEntry entry = new ProxyEntry(id, url.trim());
+                    dataStore.addProxy(entry);
+                    added.add(toResponse(entry));
+                }
+            );
         }
+
+        // Trigger immediate check in background
+        Thread.ofVirtual().start(() -> {
+            try { 
+                monitoringService.runCycle(); 
+            } catch (Exception ignored) {}
+        });
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("accepted", added.size());
-        result.put("proxies", added);
+        result.put("proxies", added); 
         return ResponseEntity.status(201).body(result);
     }
 
@@ -80,11 +94,11 @@ public class ProxyController {
 
         long up   = all.stream().filter(p -> p.getStatus() == ProxyStatus.UP).count();
         long down = all.stream().filter(p -> p.getStatus() == ProxyStatus.DOWN).count();
-        long checked = up + down;
-        double failureRate = checked == 0 ? 0.0 : (double) down / checked;
+        int totalCount = all.size();
+        double failureRate = totalCount == 0 ? 0.0 : (double) down / totalCount;
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", list.size());
+        result.put("total", totalCount);
         result.put("up", (int) up);
         result.put("down", (int) down);
         result.put("failure_rate", failureRate);
@@ -131,12 +145,13 @@ public class ProxyController {
         r.setId(e.getId());
         r.setUrl(e.getUrl());
         r.setStatus(e.getStatus().name().toLowerCase()); // "up"/"down"/"pending"
-        r.setLastCheckedAt(e.getLastCheckedAt());
+        r.setLastCheckedAt(e.getLastCheckedAt()); // Reverts to Instant (ISO 8601 string)
         r.setConsecutiveFailures(e.getConsecutiveFailures());
         r.setTotalChecks(e.getTotalChecks());
         r.setSuccessfulChecks(e.getSuccessfulChecks());
         r.setUptimePercentage(uptime);
         r.setCreatedAt(e.getCreatedAt());
+        r.setHistory(e.getHistory());
         return r;
     }
 }

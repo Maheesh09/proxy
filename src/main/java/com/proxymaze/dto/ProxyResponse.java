@@ -32,6 +32,9 @@ public class ProxyResponse {
     @JsonProperty("created_at")
     private Instant createdAt;
 
+    @JsonProperty("history")
+    private java.util.List<com.proxymaze.model.CheckRecord> history;
+
     // Getters & Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -59,4 +62,7 @@ public class ProxyResponse {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public java.util.List<com.proxymaze.model.CheckRecord> getHistory() { return history; }
+    public void setHistory(java.util.List<com.proxymaze.model.CheckRecord> history) { this.history = history; }
 }

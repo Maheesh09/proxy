@@ -3,6 +3,7 @@ package com.proxymaze.model;
 import java.time.Instant;
 
 public class CheckRecord {
+    @com.fasterxml.jackson.annotation.JsonProperty("checked_at")
     private Instant checkedAt;
     private String status;
     private Long responseTimeMs;

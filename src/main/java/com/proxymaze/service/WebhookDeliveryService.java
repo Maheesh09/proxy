@@ -97,7 +97,7 @@ public class WebhookDeliveryService {
 
                     if (code >= 200 && code < 300) {
                         deliveredKeys.add(deliveryKey); // Mark as delivered — no duplicates
-                        deliveryCount.incrementAndGet();
+                        dataStore.incrementWebhookDeliveries();
                         log.info("Webhook delivered [{}] attempt={}", deliveryKey, attempt);
                         return;
                     }

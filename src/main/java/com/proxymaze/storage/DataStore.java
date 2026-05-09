@@ -29,6 +29,10 @@ public class DataStore {
     // Runtime config (mutable, volatile reference for safe publish)
     private volatile RuntimeConfiguration config = new RuntimeConfiguration();
 
+    // Metrics counters
+    private final java.util.concurrent.atomic.AtomicLong totalChecks = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong webhookDeliveries = new java.util.concurrent.atomic.AtomicLong(0);
+
     // ─── Proxies ─────────────────────────────────────────────────────────────
 
     public void addProxy(ProxyEntry proxy) {
@@ -119,4 +123,10 @@ public class DataStore {
     public void setConfig(RuntimeConfiguration config) {
         this.config = config;
     }
+
+    public long getTotalChecks() { return totalChecks.get(); }
+    public void incrementChecks() { totalChecks.incrementAndGet(); }
+
+    public long getWebhookDeliveries() { return webhookDeliveries.get(); }
+    public void incrementWebhookDeliveries() { webhookDeliveries.incrementAndGet(); }
 }

@@ -41,7 +41,7 @@ public class ProxyEntry {
             status = ProxyStatus.DOWN;
         }
 
-        CheckRecord record = new CheckRecord(now, status.name(), responseTimeMs);
+        CheckRecord record = new CheckRecord(now, status.name().toLowerCase(), responseTimeMs);
         history.add(record);
 
         // Keep only the last MAX_HISTORY entries

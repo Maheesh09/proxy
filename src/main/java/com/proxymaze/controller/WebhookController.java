@@ -25,18 +25,19 @@ public class WebhookController {
 
     /** POST /webhooks — register a webhook receiver */
     @PostMapping
-    public ResponseEntity<Map<String, Object>> register(@RequestBody WebhookRequest req) {
-        if (req.getUrl() == null || req.getUrl().isBlank()) {
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, Object> body) {
+        String url = (String) body.get("url");
+        if (url == null || url.isBlank()) {
             throw new InvalidRequestException("url is required");
         }
 
         WebhookRegistration wh = new WebhookRegistration(
                 IdGenerator.generateId(),
-                req.getUrl().trim()
+                url.trim()
         );
         dataStore.addWebhook(wh);
 
-        return ResponseEntity.ok(Map.of(
+        return ResponseEntity.status(201).body(Map.of(
                 "webhook_id", wh.getWebhookId(),
                 "url", wh.getUrl(),
                 "message", "Webhook registered successfully"

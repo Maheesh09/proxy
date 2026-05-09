@@ -45,12 +45,14 @@ public class AlertService {
 
         if (checked.isEmpty()) return;
 
-        long downCount = checked.stream().filter(p -> p.getStatus() == ProxyStatus.DOWN).count();
-        int total = checked.size();
+        long downCount = all.stream().filter(p -> p.getStatus() == ProxyStatus.DOWN).count();
+        int total = all.size();
+        if (total == 0) return;
+        
         double failureRate = (double) downCount / total;
         double threshold = dataStore.getConfig().getFailureThreshold();
 
-        List<String> failedIds = checked.stream()
+        List<String> failedIds = all.stream()
                 .filter(p -> p.getStatus() == ProxyStatus.DOWN)
                 .map(ProxyEntry::getId)
                 .toList();

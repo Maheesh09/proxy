@@ -1,41 +1,45 @@
 package com.proxymaze.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
-@RestControllerAdvice
+@ControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    @ExceptionHandler(ProxyNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(ProxyNotFoundException ex) {
-        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(InvalidRequestException ex) {
-        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    @ExceptionHandler(ProxyNotFoundException.class)
+    public ResponseEntity<Object> handleNotFound(ProxyNotFoundException ex) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Object> handleNotFoundRoute(Exception ex) {
+        return buildErrorResponse("Route not found", HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        log.error("Unhandled exception: {}", ex.getMessage(), ex);
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+    public ResponseEntity<Object> handleGeneral(Exception ex) {
+        // Log the actual exception for debugging
+        ex.printStackTrace(); 
+        return buildErrorResponse("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
+    private ResponseEntity<Object> buildErrorResponse(String message, HttpStatus status) {
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now());
+        body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
-        body.put("timestamp", Instant.now().toString());
-        return ResponseEntity.status(status).body(body);
+        return new ResponseEntity<>(body, status);
     }
 }
